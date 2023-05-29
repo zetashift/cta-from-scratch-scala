@@ -31,7 +31,8 @@ val comments = lineComment <|> multiLineComment
 
 val ignored = skipMany(whitespace <|> comments).hide
 
-def token(s: String): Parsley[Unit] = symbol(s) *> ignored
+def lexeme[A](p: Parsley[A]): Parsley[A] = p <* ignored
+def token(s: String): Parsley[Unit] = lexeme(attempt(symbol(s)).void)
 
 val Function = token("function")
 val If = token("if")
@@ -56,7 +57,7 @@ val Identifier = attempt {
 }
 val id: Parsley[AST] = AST.Identifier(Identifier)
 
-val Not: Parsley[AST => AST] = AST.Not <# token("!")
+val Not: Parsley[Unit] = token("!")
 val Equal: Parsley[(AST, AST) => AST] = AST.Equal <# token("==")
 val NotEqual: Parsley[(AST, AST) => AST] = AST.NotEqual <# token("!=")
 
@@ -64,7 +65,7 @@ val Plus: Parsley[(AST, AST) => AST] = AST.Add <# token("+")
 val Minus: Parsley[(AST, AST) => AST] = AST.Subtract <# token("-")
 val Star: Parsley[(AST, AST) => AST] = AST.Multiply <# token("*")
 val Slash: Parsley[(AST, AST) => AST] = AST.Divide <# token("/")
-val Assign: Parsley[(String, AST) => AST] = AST.Assign <# token("=")
+val Assign: Parsley[Unit] = token("=")
 
 lazy val expression: Parsley[AST] = comparison
 
