@@ -1,3 +1,5 @@
+package zetashift.cta
+
 enum AST:
   case Number(value: Double)
   case Identifier(value: String)
@@ -8,11 +10,11 @@ enum AST:
   case Subtract(left: AST, right: AST)
   case Multiply(left: AST, right: AST)
   case Divide(left: AST, right: AST)
-  case Call(callee: String, arguments: List[AST])
+  case Call(callee: String, arguments: Vector[AST])
   case Return(term: AST)
-  case Block(statements: List[AST])
+  case Block(statements: Vector[AST])
   case If(conditional: AST, consequence: AST, alternative: AST)
-  case Function(name: String, parameters: List[String], body: AST)
+  case Function(name: String, parameters: Vector[String], body: AST)
   case Var(name: String, value: AST)
   case Assign(name: String, value: AST)
   case While(conditional: AST, body: AST)
