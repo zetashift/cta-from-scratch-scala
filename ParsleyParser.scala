@@ -19,6 +19,8 @@ import parsley.errors.combinator.ErrorMethods
 import parsley.implicits.zipped.Zipped2
 import parsley.expr.chain.*
 import parsley.debug.*
+import cats.syntax.all.*
+import parsley.cats.instances.*
 
 def symbol(s: String) = attempt(string(s))
 
@@ -94,10 +96,85 @@ lazy val call: Parsley[AST] =
   AST.Call(attempt(Identifier <* LeftParen), arguments <* RightParen)
 
 // args <- (expression (COMMA expression)*)
-lazy val arguments: Parsley[Vector[AST]] = sepBy(expression, Comma).map(_.toVector)
+lazy val arguments: Parsley[Vector[AST]] =
+  sepBy(expression, Comma).map(_.toVector)
 
+lazy val statement: Parsley[AST] =
+  returnStatement | ifStatement | whileStatement | functionStatement | varStatement | assignStatement | expressionStatement
+
+// returnStatement <- RETURN expression SEMICOLON
+lazy val returnStatement: Parsley[AST] =
+  (Return *> expression <* Semicolon).map(e => AST.Return(e))
+
+lazy val expressionStatement: Parsley[AST] =
+  expression <* Semicolon
+
+lazy val ifStatement: Parsley[AST] =
+  (
+    If *> LeftParen *> expression,
+    RightParen *> statement,
+    Else *> statement
+  ).mapN { (conditional, consequence, alternative) =>
+    AST.If(conditional, consequence, alternative)
+  }
+
+// blockStatement <- LEFT_BRACE statement* RIGHT_BRACE
+lazy val blockStatement: Parsley[AST] =
+  (LeftBrace *> many(statement) <* RightBrace).map { statements =>
+    val v = statements.toVector
+    AST.Block(v)
+  }
+
+// whileStatement <- WHILE LEFT_PAREN expression RIGHT_PAREN statement
+lazy val whileStatement: Parsley[AST] =
+  (
+    While *> LeftParen *> expression,
+    RightParen *> statement
+  ).mapN { (conditional, body) => AST.While(conditional, body) }
+
+// varStatement <- VAR ID ASSIGN expression SEMICOLON
+lazy val varStatement: Parsley[AST] =
+  (Var *> Identifier, Assign *> expression <* Semicolon).mapN { (name, value) =>
+    AST.Var(name, value)
+  }
+
+// assignmentStatement <- ID ASSIGN expression SEMICOLON
+lazy val assignStatement: Parsley[AST] =
+  (
+    Var *> Identifier,
+    Assign *> expression <* Semicolon,
+  ).mapN { (name, value) => AST.Assign(name, value) }
+
+// parameters <- (ID (COMMA ID)*)?
+lazy val parameters: Parsley[Vector[String]] =
+  (Identifier, sepBy(Identifier, Comma)).mapN { (id, params) =>
+    Vector(id).appendedAll(params.toVector)
+  } </> Vector()
+
+// functionStatement <- FUNCTION ID LEFT_PAREN parameters RIGHT_PAREN blockstatement
+lazy val functionStatement: Parsley[AST] =
+  (
+    Function *> Identifier,
+    LeftParen *> parameters,
+    RightParen *> blockStatement
+  ).mapN { (name, params, block) => AST.Function(name, params, block) }
+
+// We need to be able to parse more than one statement
+val parser: Parsley[AST] =
+  (ignored *> many(statement)).map(statements => AST.Block(statements.toVector))
 
 @main def tests() =
-  val test1 = """(1 + 3)"""
-  val result1 = expression.parse(test1)
+  val test1 = """function sdfs()"""
+  val stringD = """
+    function factorial(n) {
+      var result = 1;
+      while (n != 1) {
+        result = result * n;
+        n = n - 1;
+      }
+      return result;
+    }
+  """
+
+  val result1 = parser.parse(stringD)
   println(result1)
