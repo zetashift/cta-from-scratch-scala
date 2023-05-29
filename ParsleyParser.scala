@@ -47,14 +47,15 @@ val LeftParen: Parsley[Unit] = token("(")
 val RightParen = token(")")
 val LeftBrace = token("{")
 val RightBrace = token("}")
-val Number = stringOfSome(digit).map(n => AST.Number(n.toDouble))
+val Number = lexeme(stringOfSome(digit).map(n => AST.Number(n.toDouble)))
 
-val Identifier = attempt {
+val Identifier = lexeme(attempt {
   (
     satisfy(c => c.isLetter || c == '_'),
     stringOfMany(letterOrDigit | char('_'))
   ).zipped((c, s) => s"$c$s")
-}
+})
+
 val id: Parsley[AST] = AST.Identifier(Identifier)
 
 val Not: Parsley[Unit] = token("!")
