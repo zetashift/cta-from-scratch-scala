@@ -1,5 +1,6 @@
 package zetashift.cta
 
+import parsley.genericbridges.*
 enum AST:
   case Number(value: Double)
   case Identifier(value: String)
@@ -18,3 +19,22 @@ enum AST:
   case Var(name: String, value: AST)
   case Assign(name: String, value: AST)
   case While(conditional: AST, body: AST)
+
+object AST:
+  object Number extends ParserBridge1[Double, Number]
+  object Identifier extends ParserBridge1[String, Identifier]
+  object Not extends ParserBridge1[AST, Not]
+  object Equal extends ParserBridge2[AST, AST, Equal]
+  object NotEqual extends ParserBridge2[AST, AST, NotEqual]
+  object Add extends ParserBridge2[AST, AST, Add]
+  object Subtract extends ParserBridge2[AST, AST, Subtract]
+  object Multiply extends ParserBridge2[AST, AST, Multiply]
+  object Divide extends ParserBridge2[AST, AST, Divide]
+  object Call extends ParserBridge2[String, Vector[AST], Call]
+  object Return extends ParserBridge1[AST, Return]
+  object Block extends ParserBridge1[Vector[AST], Block]
+  object If extends ParserBridge3[AST, AST, AST, If]
+  object Function extends ParserBridge3[String, Vector[String], AST, Function]
+  object Var extends ParserBridge2[String, AST, Var]
+  object Assign extends ParserBridge2[String, AST, Assign]
+  object While extends ParserBridge2[AST, AST, While]

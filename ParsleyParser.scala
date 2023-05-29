@@ -10,12 +10,15 @@ import parsley.character.{
   satisfy,
   stringOfMany,
   letterOrDigit,
-  char
+  char,
+  stringOfSome
 }
-import parsley.combinator.{many, manyN, manyUntil, skipMany, option}
+import parsley.lift.lift2
+import parsley.combinator.{sepBy, many, manyN, manyUntil, skipMany, option}
 import parsley.errors.combinator.ErrorMethods
 import parsley.implicits.zipped.Zipped2
 import parsley.expr.chain.*
+import parsley.debug.*
 
 def symbol(s: String) = attempt(string(s))
 
@@ -26,9 +29,7 @@ val comments = lineComment <|> multiLineComment
 
 val ignored = skipMany(whitespace <|> comments).hide
 
-def token(s: String): Parsley[String] =
-  val sym = symbol(s)
-  attempt(sym <* ignored)
+def token(s: String): Parsley[Unit] = symbol(s) *> ignored
 
 val Function = token("function")
 val If = token("if")
@@ -39,11 +40,11 @@ val While = token("while")
 
 val Comma = token(",")
 val Semicolon = token(";")
-val LeftParen = token("(")
+val LeftParen: Parsley[Unit] = token("(")
 val RightParen = token(")")
 val LeftBrace = token("{")
 val RightBrace = token("}")
-val Number = digit.map(c => AST.Number(c.toDouble))
+val Number = stringOfSome(digit).map(n => AST.Number(n.toDouble))
 
 val Identifier = attempt {
   (
@@ -51,16 +52,17 @@ val Identifier = attempt {
     stringOfMany(letterOrDigit | char('_'))
   ).zipped((c, s) => s"$c$s")
 }
-val id = Identifier.map(value => AST.Identifier(value))
+val id: Parsley[AST] = AST.Identifier(Identifier)
 
-val Not: Parsley[AST => AST] = token("!").map(_ => AST.Not(_))
-val Equal: Parsley[(AST, AST) => AST] = token("==").map(_ => AST.Equal(_, _))
-val NotEqual = token("!=").map(_ => AST.NotEqual(_, _))
-val Plus = token("+").map(_ => AST.Add(_, _))
-val Minus = token("-").map(_ => AST.Subtract(_, _))
-val Star = token("*").map(_ => AST.Multiply(_, _))
-val Slash = token("/").map(_ => AST.Divide(_, _))
-val Assign = token("=").map(_ => AST.Assign(_, _))
+val Not: Parsley[AST => AST] = AST.Not <# token("!")
+val Equal: Parsley[(AST, AST) => AST] = AST.Equal <# token("==")
+val NotEqual: Parsley[(AST, AST) => AST] = AST.NotEqual <# token("!=")
+
+val Plus: Parsley[(AST, AST) => AST] = AST.Add <# token("+")
+val Minus: Parsley[(AST, AST) => AST] = AST.Subtract <# token("-")
+val Star: Parsley[(AST, AST) => AST] = AST.Multiply <# token("*")
+val Slash: Parsley[(AST, AST) => AST] = AST.Divide <# token("/")
+val Assign: Parsley[(String, AST) => AST] = AST.Assign <# token("=")
 
 lazy val expression: Parsley[AST] = comparison
 
@@ -73,37 +75,29 @@ lazy val sum: Parsley[AST] = left1(product, Plus | Minus)
 // product <- unary ((STAR / SLASH) unary)*
 lazy val product: Parsley[AST] = left1(unary, Star | Slash)
 
-lazy val unary: Parsley[AST] = for
-  not <- option(Not)
-  term <- atom
-yield not match
-  case Some(_) => AST.Not(term)
-  case None    => term
+lazy val unary: Parsley[AST] = prefix(AST.Not <# Not, atom)
 
+/** In this case, attempt is saying that its argument can either be parsed
+  * entirely, or not at all with no input consumed if it fails.
+  */
 // atom <- call / ID / Number / LeftParen expression RightParen
 lazy val atom: Parsley[AST] =
-  call | id | Number | (LeftParen *> expression).flatMap((e: AST) =>
-    RightParen *> pure(e)
-  )
+  val callOrId =
+    (Identifier, option(LeftParen *> arguments <* RightParen)).zipped {
+      case (id, Some(args)) => AST.Call(id, args)
+      case (id, None)       => AST.Identifier(id)
+    }
+  callOrId | Number | (LeftParen *> expression <* RightParen)
 
 // call <- ID LeftParen arguments RightParen
-lazy val call: Parsley[AST] = for
-  callee <- Identifier
-  _ <- LeftParen
-  args <- arguments
-  _ <- RightParen
-yield AST.Call(callee, args)
+lazy val call: Parsley[AST] =
+  AST.Call(attempt(Identifier <* LeftParen), arguments <* RightParen)
 
 // args <- (expression (COMMA expression)*)
-lazy val arguments: Parsley[Vector[AST]] =
-  val result = for
-    arg <- expression
-    args <- many(Comma *> expression)
-    _ <- RightParen
-  yield Vector(arg).appendedAll(args)
-  result </> Vector()
+lazy val arguments: Parsley[Vector[AST]] = sepBy(expression, Comma).map(_.toVector)
+
 
 @main def tests() =
-  val test1 = """!test"""
+  val test1 = """(1 + 3)"""
   val result1 = expression.parse(test1)
   println(result1)
