@@ -141,7 +141,7 @@ lazy val varStatement: Parsley[AST] =
 // assignmentStatement <- ID ASSIGN expression SEMICOLON
 lazy val assignStatement: Parsley[AST] =
   (
-    Var *> Identifier,
+    Identifier,
     Assign *> expression <* Semicolon,
   ).mapN { (name, value) => AST.Assign(name, value) }
 
