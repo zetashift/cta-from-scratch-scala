@@ -102,7 +102,7 @@ lazy val arguments: Parsley[Vector[AST]] =
   sepBy(expression, Comma).map(_.toVector)
 
 lazy val statement: Parsley[AST] =
-  returnStatement | ifStatement | whileStatement | functionStatement | varStatement | assignStatement | expressionStatement
+  returnStatement | ifStatement | whileStatement | functionStatement | varStatement | assignStatement | expressionStatement | blockStatement
 
 // returnStatement <- RETURN expression SEMICOLON
 lazy val returnStatement: Parsley[AST] =
